@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SECOM AI Assistant</title>
+<script src="https://cdn.jsdelivr.net/npm/@tableau/extensions-api@1.12.0/lib/tableau.extensions.1.latest.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Segoe UI', Arial, sans-serif; background: #0d1b2a; height: 100vh; display: flex; flex-direction: column; }
@@ -12,10 +13,10 @@
   .header-text h3 { font-size: 14px; font-weight: 700; color: #f0d080; letter-spacing: 0.5px; }
   .header-text p { font-size: 11px; color: #94a3b8; }
   .status-indicator { margin-left: auto; display: flex; align-items: center; gap: 5px; font-size: 11px; color: #4ade80; }
-  .status-dot { width: 7px; height: 7px; background: #4ade80; border-radius: 50%; box-shadow: 0 0 6px #4ade80; }
+  .status-dot { width: 7px; height: 7px; background: #4ade80; border-radius: 50%; box-shadow: 0 0 6px #4ade80; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
   .chat-container { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; background: #0d1b2a; }
   .chat-container::-webkit-scrollbar { width: 4px; }
-  .chat-container::-webkit-scrollbar-track { background: #0d1b2a; }
   .chat-container::-webkit-scrollbar-thumb { background: #c9a84c; border-radius: 2px; }
   .message { display: flex; gap: 8px; animation: fadeIn 0.3s ease; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
@@ -23,7 +24,7 @@
   .avatar { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; border: 1.5px solid #c9a84c; }
   .avatar.ai { background: #1a2d45; }
   .avatar.user { background: #7b1d2e; }
-  .bubble { max-width: 80%; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.6; }
+  .bubble { max-width: 82%; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.6; }
   .bubble.ai { background: #1a2d45; color: #e2e8f0; border: 1px solid #2d4a6b; border-top-left-radius: 4px; }
   .bubble.user { background: linear-gradient(135deg, #7b1d2e, #9b2335); color: #fff; border-top-right-radius: 4px; border: 1px solid #c9a84c44; }
   .bubble strong { color: #f0d080; }
@@ -39,7 +40,7 @@
   .input-area textarea { flex: 1; background: #0d1b2a; border: 1px solid #2d4a6b; border-radius: 10px; padding: 8px 12px; font-size: 13px; resize: none; outline: none; max-height: 80px; font-family: inherit; color: #e2e8f0; transition: border-color 0.2s; line-height: 1.4; }
   .input-area textarea::placeholder { color: #4a6080; }
   .input-area textarea:focus { border-color: #c9a84c; }
-  .send-btn { background: linear-gradient(135deg, #c9a84c, #f0d080); color: #0d1b2a; border: none; border-radius: 10px; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: opacity 0.2s; flex-shrink: 0; }
+  .send-btn { background: linear-gradient(135deg, #c9a84c, #f0d080); color: #0d1b2a; border: none; border-radius: 10px; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: opacity 0.2s; flex-shrink: 0; font-weight: bold; }
   .send-btn:hover { opacity: 0.85; }
   .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .api-setup { background: #1a2d45; border: 1px solid #c9a84c44; border-radius: 10px; padding: 12px 16px; margin: 12px; font-size: 12px; color: #94a3b8; }
@@ -52,7 +53,6 @@
   .kpi-card .value { font-size: 20px; font-weight: 700; color: #f0d080; }
   .kpi-card .label { font-size: 10px; color: #64748b; margin-top: 2px; }
   .divider { height: 1px; background: linear-gradient(to right, transparent, #c9a84c44, transparent); margin: 8px 0; }
-  .error-msg { background: #2d1515; border: 1px solid #7b1d2e; border-radius: 8px; padding: 8px 12px; font-size: 12px; color: #fca5a5; margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -65,7 +65,7 @@
   </div>
   <div class="status-indicator">
     <div class="status-dot"></div>
-    Live
+    <span id="statusText">Connecting...</span>
   </div>
 </div>
 
@@ -76,79 +76,91 @@
   <button onclick="saveApiKey()">Activate Assistant →</button>
 </div>
 
-<div class="chat-container" id="chatContainer">
-  <div class="message">
-    <div class="avatar ai">🤖</div>
-    <div>
-      <div class="bubble ai">
-        Welcome to the <strong>SECOM Process Intelligence Dashboard</strong>. I can help you analyze yield trends, sensor anomalies, and failure patterns.<br><br>
-        <strong>Production Summary — 2008</strong>
-        <div class="kpi-cards">
-          <div class="kpi-card"><div class="value">91.3%</div><div class="label">Overall Yield</div></div>
-          <div class="kpi-card"><div class="value">104</div><div class="label">Total Failures</div></div>
-          <div class="kpi-card"><div class="value">48</div><div class="label">Sensors Drifting</div></div>
-          <div class="kpi-card"><div class="value">16</div><div class="label">Alert Days</div></div>
-        </div>
-        <div class="divider"></div>
-        <div class="suggestions">
-          <button class="suggestion-btn" onclick="sendSuggestion(this)">Which sensors are drifting?</button>
-          <button class="suggestion-btn" onclick="sendSuggestion(this)">Worst yield day?</button>
-          <button class="suggestion-btn" onclick="sendSuggestion(this)">What caused the August failure?</button>
-          <button class="suggestion-btn" onclick="sendSuggestion(this)">Which shift has most failures?</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
+<div class="chat-container" id="chatContainer"></div>
 
 <div class="input-area">
   <textarea id="userInput" placeholder="Ask about yield, sensors, failures..." rows="1"
     onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
-  <button class="send-btn" id="sendBtn" onclick="sendMessage()">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-      <line x1="22" y1="2" x2="11" y2="13"></line>
-      <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-    </svg>
-  </button>
+  <button class="send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
 </div>
 
 <script>
   let apiKey = '';
   let conversationHistory = [];
+  let dashboardContext = '';
 
-  const SYSTEM_PROMPT = `You are an expert semiconductor process engineer and data analyst assistant for the SECOM manufacturing dashboard. You have deep knowledge of the following data:
+  // Try to initialize Tableau Extensions API
+  async function initTableau() {
+    try {
+      await tableau.extensions.initializeAsync();
+      const dashboard = tableau.extensions.dashboardContent.dashboard;
+      const worksheets = dashboard.worksheets;
+      
+      let context = `LIVE DASHBOARD DATA:\n- Dashboard: ${dashboard.name}\n- Worksheets: ${worksheets.map(w => w.name).join(', ')}\n`;
+      
+      // Try to get summary data from each worksheet
+      for (const ws of worksheets) {
+        try {
+          const summary = await ws.getSummaryDataAsync();
+          const cols = summary.columns.map(c => c.fieldName).join(', ');
+          context += `- ${ws.name} columns: ${cols}\n`;
+        } catch(e) {}
+      }
+      
+      dashboardContext = context;
+      document.getElementById('statusText').textContent = 'Dashboard Connected';
+      showWelcome(true);
+    } catch(e) {
+      // Not in Tableau, use static data
+      document.getElementById('statusText').textContent = 'Live';
+      showWelcome(false);
+    }
+  }
 
-PRODUCTION OVERVIEW:
-- Dataset: UCI SECOM Semiconductor Manufacturing (2008)
-- Total production records: 1,567 units
-- Overall yield rate: 91.3% (Pass: 1,463 / Fail: 104)
-- Fail rate: 6.64%
-- Production period: January to November 2008
+  function showWelcome(isLive) {
+    const container = document.getElementById('chatContainer');
+    const liveText = isLive ? 
+      'I am <strong>connected to your live dashboard</strong> and can read real-time data.' :
+      'I have deep knowledge of your <strong>SECOM semiconductor manufacturing data</strong>.';
+    
+    container.innerHTML = `
+      <div class="message">
+        <div class="avatar ai">🤖</div>
+        <div>
+          <div class="bubble ai">
+            Welcome to the <strong>SECOM Process Intelligence Dashboard</strong>. ${liveText}<br><br>
+            <strong>Production Summary — 2008</strong>
+            <div class="kpi-cards">
+              <div class="kpi-card"><div class="value">91.3%</div><div class="label">Overall Yield</div></div>
+              <div class="kpi-card"><div class="value">104</div><div class="label">Total Failures</div></div>
+              <div class="kpi-card"><div class="value">48</div><div class="label">Sensors Drifting</div></div>
+              <div class="kpi-card"><div class="value">16</div><div class="label">Alert Days</div></div>
+            </div>
+            <div class="divider"></div>
+            <div class="suggestions">
+              <button class="suggestion-btn" onclick="sendSuggestion(this)">Which sensors are drifting?</button>
+              <button class="suggestion-btn" onclick="sendSuggestion(this)">Worst yield day?</button>
+              <button class="suggestion-btn" onclick="sendSuggestion(this)">What caused the August failure?</button>
+              <button class="suggestion-btn" onclick="sendSuggestion(this)">Which shift has most failures?</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
 
-KEY FINDINGS:
-- Worst yield day: July 25, 2008 (0% yield — complete production failure)
+  const SYSTEM_PROMPT = `You are an expert semiconductor process engineer and data analyst for the SECOM manufacturing dashboard.
+
+PRODUCTION DATA (2008):
+- Total records: 1,567 units | Yield: 91.3% | Failures: 104 (6.64%)
+- Worst day: July 25, 2008 (0% yield)
 - Alert days (yield < 85%): 16 days
-- Major anomaly period: Late July to September 2008
-- Sensors out of control (high variability): 48 out of 590 sensors
-- Most critical sensors: FEATURE_22, FEATURE_23, FEATURE_24 show extreme mean deviations
+- Major anomaly: Late July–September 2008
+- Sensors out of control: 48/590 (top 10% std dev)
+- Critical sensors: FEATURE_22, FEATURE_23, FEATURE_24
 
-SENSOR ANALYSIS:
-- Total sensors monitored: 590
-- Out of control definition: Standard deviation in top 10th percentile
-- SPC method: 3-sigma control limits (UCL/LCL)
-- Sensors anonymized due to semiconductor IP protection
+DATA PIPELINE: UCI SECOM → Snowflake (RAW→STAGING→MART) → Tableau Cloud
 
-FAILURE PATTERNS:
-- Failures distributed across all days of week
-- August period shows highest failure concentration
-- Failure count per day ranges from 1 to 6 units
-- 16 days recorded yield below 85% alert threshold
-
-DATA PIPELINE:
-- Raw data → Snowflake (RAW → STAGING → MART) → Tableau Cloud
-- Tools: Snowflake, Tableau Cloud, SQL, Python (KNN imputation for missing values)
-
-Always respond as a helpful process engineer. Be concise, use bullet points for multiple items, and always include actionable insights. Keep responses under 150 words unless detailed analysis is requested.`;
+Be concise, use bullet points, always give actionable engineering insights. Under 150 words unless asked for detail.`;
 
   function saveApiKey() {
     const input = document.getElementById('apiKeyInput').value.trim();
@@ -224,7 +236,11 @@ Always respond as a helpful process engineer. Be concise, use bullet points for 
     input.style.height = 'auto';
 
     addMessage('user', text);
-    conversationHistory.push({ role: 'user', content: text });
+    
+    const fullMessage = dashboardContext ? 
+      `${dashboardContext}\n\nUser question: ${text}` : text;
+    
+    conversationHistory.push({ role: 'user', content: fullMessage });
     showTyping();
 
     try {
@@ -252,7 +268,7 @@ Always respond as a helpful process engineer. Be concise, use bullet points for 
         conversationHistory.push({ role: 'assistant', content: reply });
         addMessage('assistant', reply);
       } else {
-        addMessage('assistant', 'Sorry, I encountered an error: ' + JSON.stringify(data.error || data));
+        addMessage('assistant', 'Error: ' + JSON.stringify(data.error || data));
       }
     } catch (error) {
       removeTyping();
@@ -262,6 +278,9 @@ Always respond as a helpful process engineer. Be concise, use bullet points for 
     sendBtn.disabled = false;
     input.focus();
   }
+
+  // Initialize
+  initTableau();
 </script>
 </body>
 </html>
